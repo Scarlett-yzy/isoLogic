@@ -20,6 +20,11 @@ HERE = Path(__file__).resolve().parent
 OUT = HERE
 ACCEL = 8.0            # 等待段加速倍率；改成 4 就是 4 倍速
 W, H = 860, 1864
+# 片头掐掉几秒。首次访问 CloudBase 测试域名会先落到腾讯云的「风险提醒」页
+# （「仅供开发测试使用…请勿泄露个人信息」，还要等 3 秒倒计时才能点「确定访问」），
+# 录屏脚本也是那时候才点进去的 —— 留着的话成片第一帧和海报就是那张警告页。
+# 实测 3.8s 处已经是知源首页，取 3.9s 留点余量。换域名后若没有这道闸，改成 0。
+HEAD_TRIM = 3.9
 
 RAW = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(
     (HERE / "raw.video.path").read_text(encoding="utf-8").strip())
@@ -45,6 +50,7 @@ FF = find_ffmpeg()
 
 marks = json.loads(STEPS.read_text(encoding="utf-8"))
 t0 = marks[0]["t"]  # v0_start ≈ 视频起点（page 创建后立刻打点）
+ORIGIN = t0 + HEAD_TRIM  # 成片实际从原始录屏的这个时刻开始
 
 
 def run(cmd: list) -> None:
@@ -57,11 +63,17 @@ def run(cmd: list) -> None:
 segments = []
 for i in range(len(marks) - 1):
     a, b = marks[i], marks[i + 1]
-    start, end = a["t"] - t0, b["t"] - t0
-    dur = end - start
+    # 片头处理：输出时间轴从原始录屏的 ORIGIN 处开始，落在它之前的段被截断。
+    # ⚠️ 这里必须按「原始时刻」截，不能写成 max(a["t"] - t0 - HEAD_TRIM, 0)：
+    # 前两个打点（v0_start / s0_load）都在 +0.00s，那样算出来 start=0、dur 却
+    # 少 3.9s，ffmpeg 拿到 -ss 0 仍旧从原始文件第 0 秒读 —— 等于把片头剪掉了
+    # 长度、内容还是警告页，还会在首页前多一道跳切。
+    raw_start = max(a["t"], ORIGIN)
+    raw_end = max(b["t"], ORIGIN)
+    dur = raw_end - raw_start
     if dur < 0.2:
         continue
-    segments.append({"name": a["name"], "start": max(start, 0.0), "dur": dur,
+    segments.append({"name": a["name"], "start": raw_start - t0, "dur": dur,
                      "accel": bool(a["accel"]), "idx": len(segments)})
 
 total_wall = sum(s["dur"] for s in segments)
@@ -92,7 +104,7 @@ run([FF, "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list), "-c", "copy
      "-movflags", "+faststart", str(FINAL)])
 print(f"final: {FINAL} ({FINAL.stat().st_size/1e6:.1f} MB)")
 
-# 海报帧：取成片 1.5s 处（首页首屏）
+# 海报帧：取成片 1.5s 处（片头掐掉后这里正是知源首页首屏）
 run([FF, "-y", "-ss", "1.5", "-i", str(FINAL), "-frames:v", "1", "-q:v", "2",
      str(OUT / "poster.jpg")])
 print(f"poster: {OUT/'poster.jpg'}")
