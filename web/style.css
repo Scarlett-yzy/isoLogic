@@ -1899,6 +1899,37 @@ label,
   line-height: 1.55;
 }
 
+/* 同源分析耗时较长时，把等待提示提升到视口中央，阅读更舒适。 */
+.local-loading.is-discover-loading {
+  top: 50%;
+  bottom: auto;
+  width: min(360px, calc(100% - 28px));
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 18px 18px 16px;
+  border-radius: 22px;
+  text-align: center;
+}
+.local-loading.is-discover-loading .loading-copy {
+  width: 100%;
+  align-items: center;
+}
+.loading-quote-card {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(113, 151, 174, .26);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(255,255,255,.9), rgba(237,247,251,.84));
+  box-shadow: 0 8px 24px rgba(73, 111, 128, .12);
+}
+.loading-quote-card[hidden] { display: none; }
+.loading-quote-mark { display: block; color: var(--brand-600, #4f8494); font-size: 19px; line-height: 1; }
+.loading-quote-card p { margin: 7px 0 5px; color: var(--ink); font-size: 16px; line-height: 1.65; }
+.loading-quote-card small { color: var(--muted); font-size: 12px; }
+.local-loading.is-discover-loading .loading-cancel { width: 100%; margin-left: 0; }
+
 /* 极短角标也统一到 15px，不留“角标可以继续小”的例外。 */
 .notification-badge,
 .local-card-badge,

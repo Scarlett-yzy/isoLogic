@@ -148,24 +148,49 @@ const profileLabels = {
 
 let loadingTimer = null;
 let loadingStartedAt = 0;
+let loadingQuoteTimer = null;
+let loadingQuoteIndex = 0;
+const LOADING_QUOTES = [
+  "慢一点没关系，真正重要的答案值得等待。",
+  "每一次认真思考，都是在给未来的自己铺路。",
+  "你现在走的每一步，都会成为以后理解世界的线索。",
+  "别急，复杂的问题正在一点点变清楚。",
+  "看似绕远的探索，常常会带你发现新的连接。",
+  "保持好奇，答案往往藏在下一个问题里。",
+  "今天积累的一点点，终会变成自己的底气。",
+  "先把问题想清楚，答案自然会找到入口。"
+];
 function setLoading(active, text = "正在分析…", trigger = null) {
   // 提示拆成上下两行：这一行是任务说明，下面 loadingTimer 那行是「已等待 N 秒…」。
   // 原先两段拼在同一个 span 里，字串一长就是超宽的一整条，窄屏上还会从中间断开、
   // 把「18 秒」拆到两行去。现在各占一行，宽度也由 CSS 收住了。
   $("loadingText").textContent = text;
   $("loadingTimer").textContent = "";
+  const isDiscover = active && trigger?.id === "discoverButton";
+  const wasDiscover = $("loading").classList.contains("is-discover-loading");
   $("loading").hidden = !active;
-  $("cancelLoading").hidden = !(active && trigger?.id === "discoverButton");
+  $("loading").classList.toggle("is-discover-loading", isDiscover);
+  $("loadingQuoteCard").hidden = !isDiscover;
+  $("cancelLoading").hidden = !isDiscover;
   if (trigger) trigger.disabled = active;
   window.clearInterval(loadingTimer);
+  if (!isDiscover) window.clearInterval(loadingQuoteTimer);
   if (active) {
-    loadingStartedAt = Date.now();
+    if (!wasDiscover || !isDiscover) loadingStartedAt = Date.now();
     const tick = () => {
       const seconds = Math.floor((Date.now() - loadingStartedAt) / 1000);
       $("loadingTimer").textContent = `已等待 ${seconds} 秒，请不要重复提交…`;
     };
     tick();   // 立刻显示：等第一次 interval 才写的话，提示会先窄后高地跳一下
     loadingTimer = window.setInterval(tick, 1000);
+    if (isDiscover && !wasDiscover) {
+      const showQuote = () => {
+        $("loadingQuote").textContent = LOADING_QUOTES[loadingQuoteIndex % LOADING_QUOTES.length];
+        loadingQuoteIndex += 1;
+      };
+      showQuote();
+      loadingQuoteTimer = window.setInterval(showQuote, 4000);
+    }
   }
 }
 
@@ -190,6 +215,7 @@ async function request(path, payload, options = {}) {
     headers: payload == null ? {} : { "Content-Type": "application/json" },
     body: payload == null ? undefined : JSON.stringify(payload),
     signal: options.signal,
+    cache: options.cache || "no-store",
   });
   let data;
   try { data = await response.json(); } catch { data = {}; }
@@ -896,7 +922,7 @@ async function discover() {
     if (data.async) {
       // 后台任务轮询：请求立即结束，避免云托管网关因长时间无响应返回 504。
       for (;;) {
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        await new Promise(resolve => setTimeout(resolve, 2000));
         if (controller.signal.aborted) throw new DOMException("分析已取消", "AbortError");
         const progress = await request(`/api/discover/${encodeURIComponent(data.task_id)}`, null, { method: "GET" });
         if (progress.done) { data = progress.result; break; }

@@ -195,6 +195,11 @@
   <div class="local-loading" id="loading" hidden aria-live="polite" aria-label="正在处理">
     <div class="spinner"></div>
     <div class="loading-copy"><span id="loadingText">正在分析…</span><span class="loading-timer" id="loadingTimer"></span></div>
+    <div class="loading-quote-card" id="loadingQuoteCard" hidden>
+      <span class="loading-quote-mark" aria-hidden="true">✦</span>
+      <p id="loadingQuote"></p>
+      <small>慢一点没关系，好答案值得等待</small>
+    </div>
     <button class="loading-cancel" id="cancelLoading" type="button" hidden>取消分析</button>
   </div>
   <button class="back-to-top" id="backToTop" type="button" aria-label="回到顶部">↑</button>
