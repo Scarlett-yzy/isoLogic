@@ -21,8 +21,10 @@ class CachedStaticFiles(StaticFiles):
         response = await super().get_response(path, scope)
         normalized_path = path.replace("\\", "/")
         if normalized_path.startswith("assets/"):
-            # 一天即可：单次会话内素材不会重复下载，而桌宠素材还在反复裁切，
-            # 设成一年 immutable 会让老访客永远看不到新图，排查时极易误判。
+            # 一天：够单次会话内不重复下载，又不至于让反复裁切的桌宠素材在老访客
+            # 那里永远停在旧图（设一年 immutable 排查时极易误判）。
+            # ⚠️ 云托管的网关（server: cbrgw）会另发一条 no-store 盖掉这里，
+            # 所以桌宠素材在 web/app.js 里改用 blob:URL，不指望 HTTP 缓存。
             response.headers["Cache-Control"] = "public, max-age=86400, immutable"
         else:
             response.headers["Cache-Control"] = "no-cache"

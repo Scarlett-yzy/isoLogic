@@ -1016,26 +1016,44 @@ function cachedDesktopPetFramePath(action, index, topbar = false) {
     || (topbar ? topbarPetFramePath(action, index) : desktopPetFramePath(action, index));
 }
 
+// 素材一律先取回来、转成 blob:URL 再交给 <img>。
+// 云托管的网关会给每个响应强加 `no-store`，浏览器因此不会复用 HTTP 缓存
+// —— 若直接换 src，每一帧都会重走一遍网络（实测 200~600ms/帧），动画必卡。
+// blob:URL 存在内存里，换帧零网络，且不受任何缓存头影响。
 function loadDesktopPetFrame(path, retry = 0) {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    const timer = window.setTimeout(() => reject(new Error(`桌宠素材加载超时：${path}`)), 8000);
-    image.onload = () => { window.clearTimeout(timer); resolve(image); };
-    image.onerror = () => {
-      window.clearTimeout(timer);
-      if (retry < 2) window.setTimeout(() => loadDesktopPetFrame(path, retry + 1).then(resolve, reject), 500 * (retry + 1));
-      else reject(new Error(`桌宠素材加载失败：${path}`));
-    };
-    image.src = retry ? `${path}?retry=${retry}` : path;
-  });
+  const controller = new AbortController();
+  const timers = [window.setTimeout(() => controller.abort(), 8000)];
+  const stop = () => timers.forEach((id) => window.clearTimeout(id));
+  return fetch(retry ? `${path}?retry=${retry}` : path, { signal: controller.signal })
+    .then((response) => {
+      if (!response.ok) throw new Error(`桌宠素材 HTTP ${response.status}：${path}`);
+      return response.blob();
+    })
+    .then((blob) => new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(blob);
+      const image = new Image();
+      // 下载和解码都要有上限，否则播放前的 await 会永远挂着
+      timers.push(window.setTimeout(() => { URL.revokeObjectURL(objectUrl); reject(new Error(`桌宠素材解码超时：${path}`)); }, 8000));
+      image.onload = () => { stop(); resolve(image); };
+      image.onerror = () => { stop(); URL.revokeObjectURL(objectUrl); reject(new Error(`桌宠素材解码失败：${path}`)); };
+      image.src = objectUrl;  // 解码完再交出去，免得第一次换到这一帧时才解码而掉帧
+    }))
+    .catch(async (error) => {
+      stop();
+      if (retry < 2) {
+        await new Promise((resolve) => window.setTimeout(resolve, 500 * (retry + 1)));
+        return loadDesktopPetFrame(path, retry + 1);
+      }
+      throw error;
+    });
 }
 
 function preloadDesktopPetAction(action, topbar = false) {
   const key = `${topbar ? "topbar" : "main"}:${action}`;
   if (desktopPetFrameCache.has(key)) return desktopPetFrameCache.get(key);
   const config = DESKTOP_PET_ACTIONS[action];
+  const frames = [];
   const promise = (async () => {
-    const frames = [];
     // 每批只取 3 帧，避免云托管被几十个并发静态请求冲垮。
     for (let index = 0; index < config.frames; index += 3) {
       const batch = [index, index + 1, index + 2].filter((item) => item < config.frames);
@@ -1045,7 +1063,12 @@ function preloadDesktopPetAction(action, topbar = false) {
     return frames;
   })();
   desktopPetFrameCache.set(key, promise);
-  promise.catch(() => desktopPetFrameCache.delete(key));
+  promise.catch(() => {
+    // 失败就整组作废、下次重来，顺便把已经建出来的 blob 收回去，别泄漏
+    frames.forEach((image) => URL.revokeObjectURL(image.src));
+    frames.length = 0;
+    desktopPetFrameCache.delete(key);
+  });
   return promise;
 }
 
