@@ -15,18 +15,18 @@
 ### 1. 拿到代码 —— ⚠️ 目录名必须叫 `logic_coloc`
 
 本仓库的目录**本身就是一个 Python 包**（模块之间用相对导入 `from . import …`），
-所以目录名必须和包名一致。而 GitHub 上的仓库名是 `logic-coloc`（连字符），
-Python 不认识这个名字 —— 直接 clone 会得到一个 `logic-coloc/`，启动时报
+所以目录名必须和包名一致。而 GitHub 上的仓库名是 `isoLogic`，
+Python 不认识这个名字 —— 直接 clone 会得到一个 `isoLogic/`，启动时报
 `ModuleNotFoundError: No module named 'logic_coloc'`。
 
 **所以克隆时显式指定目标目录名：**
 
 ```bash
-git clone https://github.com/Scarlett-yzy/logic-coloc.git logic_coloc
+git clone https://github.com/Scarlett-yzy/isoLogic.git logic_coloc
 ```
 
-已经 clone 过了也不要紧，改个名即可：`mv logic-coloc logic_coloc`
-（Windows：`ren logic-coloc logic_coloc`）
+已经 clone 过了也不要紧，改个名即可：`mv isoLogic logic_coloc`
+（Windows：`ren isoLogic logic_coloc`）
 
 ### 2. 装依赖
 
@@ -154,7 +154,7 @@ Dockerfile** 构建镜像、起容器、跑一遍真实请求 —— 等价于�
 
 ```bash
 curl -s -H "Authorization: Bearer <你的 token>" \
-  https://api.github.com/repos/Scarlett-yzy/logic-coloc/actions/runs/<run-id>/annotations
+  https://api.github.com/repos/Scarlett-yzy/isoLogic/actions/runs/<run-id>/annotations
 ```
 
 > 一定带上 `Authorization` 头：不带就是匿名额度，**每小时只有 60 次且按出口 IP 计**，

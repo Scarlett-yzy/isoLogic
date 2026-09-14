@@ -11,7 +11,7 @@
 |---|---|---|
 | CloudBase 控制台权限 | 交付方 | 用团队已有的环境；要新建的话，地域挑离用户近的（例如上海） |
 | 模型 API Key | 交付方**私聊**发你 | `sk-` 开头的一长串。**不要**贴进群聊、文档、Issue、代码、GitHub —— 泄漏了只能作废重发 |
-| 仓库地址 | 交付方 | `https://github.com/Scarlett-yzy/logic-coloc`，**公开仓库**，平台拉代码不需要授权 |
+| 仓库地址 | 交付方 | `https://github.com/Scarlett-yzy/isoLogic`，**公开仓库**，平台拉代码不需要授权 |
 
 > 三样里只有 Key 需要保密，其余可以直接在群里说。
 
@@ -67,7 +67,7 @@ logic_coloc/
 | 字段 | 填什么 |
 |---|---|
 | 来源 | **代码仓库（GitHub 构建）** |
-| 仓库 | `https://github.com/Scarlett-yzy/logic-coloc` |
+| 仓库 | `https://github.com/Scarlett-yzy/isoLogic` |
 | 分支 | `main` |
 | 构建方式 | **Dockerfile** |
 | Dockerfile 路径 | 留空（就在仓库根目录） |

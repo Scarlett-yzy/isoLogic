@@ -15,7 +15,7 @@ doc.add_paragraph('推荐使用 CloudBase 云托管，从 GitHub main 分支按 
 doc.add_heading('二 项目是否有数据库写入',1)
 for t in ['没有外部数据库连接：requirements.txt 和代码中没有 MySQL、PostgreSQL、MongoDB、Redis 客户端。','存在文件级写入：data/、uploads/ 可能保存运行时文件；这不是数据库，且 Demo 模式不应依赖其长期存在。','演示模式会清理浏览器本地的笔记、卡片和历史，刷新页面后重新开始，符合即插即用定位。','如果以后要做正式产品，再接入 CloudBase 数据库或对象存储，并关闭 DEMO_MODE。']: doc.add_paragraph(t, style='List Bullet')
 doc.add_heading('三 CloudBase 部署步骤',1)
-steps=['将仓库推送到 GitHub：https://github.com/Scarlett-yzy/logic-coloc，确认分支为 main，提交至少包含 1da8af3。','进入 CloudBase 控制台 → 云托管 → 新建服务。代码来源选择 GitHub 构建，仓库选择上述地址，分支选择 main，构建方式选择 Dockerfile。','容器端口填写 8000；请求超时填写 300 秒；最小实例 1，最大实例 1；建议 1 核 2 GB。启动命令留空，由 Dockerfile 自动执行。','在环境变量中填写模型 API 和知乎搜索配置。不要把真实密钥写进 GitHub。','点击部署，等待镜像构建完成。首次构建可能需要数分钟。','打开部署后的域名首页和 /api/health 验收。']
+steps=['将仓库推送到 GitHub：https://github.com/Scarlett-yzy/isoLogic，确认分支为 main，且推的是最新提交。','进入 CloudBase 控制台 → 云托管 → 新建服务。代码来源选择 GitHub 构建，仓库选择上述地址，分支选择 main，构建方式选择 Dockerfile。','容器端口填写 8000；请求超时填写 300 秒；最小实例 1，最大实例 1；建议 1 核 2 GB。启动命令留空，由 Dockerfile 自动执行。','在环境变量中填写模型 API 和知乎搜索配置。不要把真实密钥写进 GitHub。','点击部署，等待镜像构建完成。首次构建可能需要数分钟。','打开部署后的域名首页和 /api/health 验收。']
 for i,t in enumerate(steps,1): doc.add_paragraph(f'{i}. {t}')
 doc.add_heading('四 必填环境变量',1)
 table=doc.add_table(rows=1, cols=3); table.alignment=WD_TABLE_ALIGNMENT.CENTER; table.style='Table Grid'

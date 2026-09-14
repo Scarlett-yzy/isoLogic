@@ -31,7 +31,7 @@ DEFAULT_COVER = {
     "subtitle": "CloudBase 云托管部署说明",
     "meta": [
         ("交付给", "负责部署的同学"),
-        ("代码仓库", "https://github.com/Scarlett-yzy/logic-coloc"),
+        ("代码仓库", "https://github.com/Scarlett-yzy/isoLogic"),
         ("分支", "main"),
     ],
 }
