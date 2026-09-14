@@ -149,6 +149,7 @@ const profileLabels = {
 let loadingTimer = null;
 let loadingStartedAt = 0;
 let loadingQuoteTimer = null;
+let loadingQuoteStartTimer = null;
 let loadingQuoteIndex = 0;
 const LOADING_QUOTES = [
   "慢一点没关系，真正重要的答案值得等待。",
@@ -167,29 +168,37 @@ function setLoading(active, text = "正在分析…", trigger = null) {
   $("loadingText").textContent = text;
   $("loadingTimer").textContent = "";
   const isDiscover = active && trigger?.id === "discoverButton";
-  const wasDiscover = $("loading").classList.contains("is-discover-loading");
+  const wasLongLoading = $("loading").classList.contains("is-long-loading");
   $("loading").hidden = !active;
-  $("loading").classList.toggle("is-discover-loading", isDiscover);
-  $("loadingQuoteCard").hidden = !isDiscover;
+  $("loading").classList.toggle("is-long-loading", active);
+  $("loadingQuoteCard").hidden = true;
   $("cancelLoading").hidden = !isDiscover;
   if (trigger) trigger.disabled = active;
   window.clearInterval(loadingTimer);
-  if (!isDiscover) window.clearInterval(loadingQuoteTimer);
+  if (!active) {
+    window.clearTimeout(loadingQuoteStartTimer);
+    window.clearInterval(loadingQuoteTimer);
+  }
   if (active) {
-    if (!wasDiscover || !isDiscover) loadingStartedAt = Date.now();
+    if (!wasLongLoading) loadingStartedAt = Date.now();
     const tick = () => {
       const seconds = Math.floor((Date.now() - loadingStartedAt) / 1000);
       $("loadingTimer").textContent = `已等待 ${seconds} 秒，请不要重复提交…`;
     };
     tick();   // 立刻显示：等第一次 interval 才写的话，提示会先窄后高地跳一下
     loadingTimer = window.setInterval(tick, 1000);
-    if (isDiscover && !wasDiscover) {
+    if (!wasLongLoading) {
       const showQuote = () => {
         $("loadingQuote").textContent = LOADING_QUOTES[loadingQuoteIndex % LOADING_QUOTES.length];
         loadingQuoteIndex += 1;
       };
-      showQuote();
-      loadingQuoteTimer = window.setInterval(showQuote, 4000);
+      loadingQuoteStartTimer = window.setTimeout(() => {
+        if (!$("loading").hidden) {
+          $("loadingQuoteCard").hidden = false;
+          showQuote();
+          loadingQuoteTimer = window.setInterval(showQuote, 4000);
+        }
+      }, 900);
     }
   }
 }
@@ -551,6 +560,8 @@ async function saveKnowledgeCard() {
     $("saveCardStatus").textContent = "后端暂时不可用，已本地保存并将在下次自动同步。"; showToast("后端暂时不可用，卡片已本地保存");
   }
   button.disabled = false; button.textContent = "确认存入卡片";
+  playDesktopPetAction("savecard");
+  playTopbarPetAction("blink");
   closeSaveCardSheet();
 }
 
@@ -997,6 +1008,12 @@ const DESKTOP_PET_ACTIONS = Object.freeze({
   followup: { label: "深入追问", frames: 16, speech: "让我戴好眼镜，我们再往深处想一层。" },
   crosslink: { label: "发现同源", frames: 16, speech: "找到一条跨学科连接，原来它们共享同一种逻辑！" },
   levelup: { label: "庆祝进步", frames: 16, speech: "撒花！每一点积累都在让你变得更厉害。" },
+  savecard: { label: "知识存卡", frames: 18, speech: "收好这份知识，已经放进你的卡片库啦！" },
+  mastered: { label: "复习掌握", frames: 16, speech: "太棒了，这个知识点已经真正掌握！" },
+  forgotten: { label: "再试一次", frames: 16, speech: "没关系，再复习一次就会越来越熟。" },
+  newnote: { label: "新建笔记", frames: 16, speech: "把今天的思考写下来，灵感就不会走丢。" },
+  newbook: { label: "整理书架", frames: 15, speech: "书架整理好了，知识也变得更有条理！" },
+  blink: { label: "眨眼", frames: 2, speech: "我在这里，陪你继续探索。" },
 });
 const DESKTOP_PET_RANDOM_ACTIONS = ["wave", "idea", "followup", "crosslink"];
 const desktopPetReduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1009,11 +1026,16 @@ function desktopPetFramePath(action, index) {
   return `/static/assets/pet/${action}/${action}_${index + 1}.webp`;
 }
 function topbarPetFramePath(action, index) {
-  return `/static/assets/pet/topbar/${action}/${action}_${index + 1}.webp`;
+  const topbarAction = action === "blink" ? "blink" : action;
+  return `/static/assets/pet/topbar/${topbarAction}/${topbarAction}_${index + 1}.webp`;
 }
 function cachedDesktopPetFramePath(action, index, topbar = false) {
   return desktopPetResolvedFrames.get(`${topbar ? "topbar" : "main"}:${action}`)?.[index]?.src
     || (topbar ? topbarPetFramePath(action, index) : desktopPetFramePath(action, index));
+}
+function nextReadyPetFrame(action, index, topbar = false) {
+  const frames = desktopPetResolvedFrames.get(`${topbar ? "topbar" : "main"}:${action}`);
+  return frames?.[index] ? frames[index].src : null;
 }
 
 // 素材一律先取回来、转成 blob:URL 再交给 <img>。
@@ -1052,22 +1074,34 @@ function preloadDesktopPetAction(action, topbar = false) {
   const key = `${topbar ? "topbar" : "main"}:${action}`;
   if (desktopPetFrameCache.has(key)) return desktopPetFrameCache.get(key);
   const config = DESKTOP_PET_ACTIONS[action];
-  const frames = [];
+  const frames = new Array(config.frames);
+  desktopPetResolvedFrames.set(key, frames);
   const promise = (async () => {
-    // 每批只取 3 帧，避免云托管被几十个并发静态请求冲垮。
-    for (let index = 0; index < config.frames; index += 3) {
-      const batch = [index, index + 1, index + 2].filter((item) => item < config.frames);
-      frames.push(...await Promise.all(batch.map((item) => loadDesktopPetFrame(topbar ? topbarPetFramePath(action, item) : desktopPetFramePath(action, item)))));
-    }
-    desktopPetResolvedFrames.set(key, frames);
+    // 受控并发：优先按帧序启动前几帧，最多同时 6 个请求，避免严格的
+    // “一批完成后才开始下一批”让后续帧准备得过晚。
+    let nextIndex = 0;
+    const worker = async () => {
+      for (;;) {
+        const index = nextIndex;
+        nextIndex += 1;
+        if (index >= config.frames) return;
+        try {
+          frames[index] = await loadDesktopPetFrame(topbar ? topbarPetFramePath(action, index) : desktopPetFramePath(action, index));
+        } catch (error) {
+          console.warn(error.message);
+          // 保留原始 URL 作为兜底，让播放指针不会被永久卡在上一帧。
+          frames[index] = { src: topbar ? topbarPetFramePath(action, index) : desktopPetFramePath(action, index) };
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(6, config.frames) }, () => worker()));
     return frames;
   })();
   desktopPetFrameCache.set(key, promise);
   promise.catch(() => {
     // 失败就整组作废、下次重来，顺便把已经建出来的 blob 收回去，别泄漏
-    frames.forEach((image) => URL.revokeObjectURL(image.src));
-    frames.length = 0;
-    desktopPetFrameCache.delete(key);
+    frames.forEach((image) => { if (image) URL.revokeObjectURL(image.src); });
+    desktopPetResolvedFrames.delete(key);
   });
   return promise;
 }
@@ -1087,43 +1121,35 @@ function clearTopbarPetTimers() {
   if (topbarPetTimer) { window.clearInterval(topbarPetTimer); topbarPetTimer = null; }
   if (topbarPetPauseTimer) { window.clearTimeout(topbarPetPauseTimer); topbarPetPauseTimer = null; }
 }
-async function startTopbarGreetingLoop() {
-  const sprite = $("topbarPetSprite"), config = DESKTOP_PET_ACTIONS.wave;
-  if (!sprite || !config) return;
+function startTopbarGreetingLoop() {
+  const sprite = $("topbarPetSprite");
+  if (!sprite) return;
   clearTopbarPetTimers();
-  const playId = ++topbarPetPlayId;
-  try { await preloadDesktopPetAction("wave", true); }
-  catch (error) { console.warn(error.message); topbarPetPauseTimer = window.setTimeout(startTopbarGreetingLoop, 3000); return; }
-  if (playId !== topbarPetPlayId) return;
-  let index = 0;
-  sprite.src = cachedDesktopPetFramePath("wave", index, true);
-  if (desktopPetReduceMotion) { topbarPetPauseTimer = window.setTimeout(startTopbarGreetingLoop, 3000); return; }
-  topbarPetTimer = window.setInterval(() => {
-    index += 1;
-    if (index >= config.frames) { clearTopbarPetTimers(); topbarPetPauseTimer = window.setTimeout(startTopbarGreetingLoop, 3000); return; }
-    sprite.src = cachedDesktopPetFramePath("wave", index, true);
-  }, 182);
+  // 顶部固定显示“休息一下”的完整首帧，不再自动播放或改变大小。
+  sprite.src = topbarPetFramePath("normal", 0);
 }
-async function playTopbarPetAction(action) {
+function playTopbarPetAction(action) {
   const config = DESKTOP_PET_ACTIONS[action], sprite = $("topbarPetSprite");
   if (!config || !sprite) return;
   clearTopbarPetTimers();
   const playId = ++topbarPetPlayId;
-  try { await preloadDesktopPetAction(action, true); }
-  catch (error) { console.warn(error.message); topbarPetPauseTimer = window.setTimeout(startTopbarGreetingLoop, 3000); return; }
-  if (playId !== topbarPetPlayId) return;
-  let index = 0; sprite.src = cachedDesktopPetFramePath(action, index, true);
+  preloadDesktopPetAction(action, true).catch((error) => console.warn(error.message));
+  let index = 0; sprite.src = topbarPetFramePath(action, index);
   if (desktopPetReduceMotion) { topbarPetPauseTimer = window.setTimeout(startTopbarGreetingLoop, action === "wave" ? 3000 : 700); return; }
   topbarPetTimer = window.setInterval(() => {
-    index += 1;
-    if (index >= config.frames) { clearTopbarPetTimers(); topbarPetPauseTimer = window.setTimeout(startTopbarGreetingLoop, action === "wave" ? 3000 : 700); return; }
-    sprite.src = cachedDesktopPetFramePath(action, index, true);
+    const nextIndex = index + 1;
+    if (nextIndex >= config.frames) { clearTopbarPetTimers(); topbarPetPauseTimer = window.setTimeout(startTopbarGreetingLoop, action === "wave" ? 3000 : 700); return; }
+    const next = nextReadyPetFrame(action, nextIndex, true);
+    if (!next) return;
+    index = nextIndex;
+    sprite.src = next;
   }, 182);
 }
 
 function restDesktopPet(keepSpeech = true) {
   desktopPetPlayId += 1;
   if (desktopPetTimer) { window.clearInterval(desktopPetTimer); desktopPetTimer = null; }
+  if ($("petReactionOverlay")) $("petReactionOverlay").hidden = true;
   document.querySelectorAll("[data-pet-action]").forEach((button) => button.classList.remove("is-playing"));
   if (!$("desktopPetState")) return;
   $("desktopPetState").textContent = DESKTOP_PET_ACTIONS.normal.label;
@@ -1131,24 +1157,27 @@ function restDesktopPet(keepSpeech = true) {
   setDesktopPetFrame("normal", 0);
 }
 
-async function playDesktopPetAction(action) {
+function playDesktopPetAction(action, passive = true) {
   const config = DESKTOP_PET_ACTIONS[action];
   if (!config || !$("desktopPetSprite")) return;
+  const overlay = $("petReactionOverlay"), overlaySprite = $("petReactionSprite"), overlayLabel = $("petReactionLabel");
+  if (overlay && overlaySprite && overlayLabel && passive && action !== "normal") { overlay.hidden = false; overlayLabel.textContent = config.label; overlaySprite.src = desktopPetFramePath(action, 0); }
   if (desktopPetTimer) window.clearInterval(desktopPetTimer);
   const playId = ++desktopPetPlayId;
   document.querySelectorAll("[data-pet-action]").forEach((button) => button.classList.toggle("is-playing", button.dataset.petAction === action));
   $("desktopPetState").textContent = config.label;
   $("desktopPetSpeech").textContent = config.speech;
-  try { await preloadDesktopPetAction(action); }
-  catch (error) { console.warn(error.message); if (playId === desktopPetPlayId) restDesktopPet(true); return; }
-  if (playId !== desktopPetPlayId) return;
+  preloadDesktopPetAction(action).catch((error) => console.warn(error.message));
   if (desktopPetReduceMotion) { setDesktopPetFrame(action, config.frames - 1); desktopPetTimer = window.setTimeout(() => restDesktopPet(true), 700); return; }
   let index = 0;
   setDesktopPetFrame(action, index);
   desktopPetTimer = window.setInterval(() => {
-    index += 1;
-    if (index >= config.frames) { restDesktopPet(true); return; }
+    const nextIndex = index + 1;
+    if (nextIndex >= config.frames) { restDesktopPet(true); return; }
+    if (!nextReadyPetFrame(action, nextIndex)) return;
+    index = nextIndex;
     setDesktopPetFrame(action, index);
+    if (overlay && passive && !overlay.hidden) overlaySprite.src = cachedDesktopPetFramePath(action, index);
   }, 182);
 }
 
@@ -1156,7 +1185,7 @@ function openDesktopPet() {
   const points = getPoints(), level = getLevelInfo(points);
   $("desktopPetEnergy").textContent = `${level.level} · ${points} 能量`;
   activateAppPage("desktopPetPage");
-  playDesktopPetAction("wave");
+  playDesktopPetAction("wave", false);
   // 待机帧趁挥手这 2 秒的空档先备好，免得收势时精灵图闪一下空白。
   preloadDesktopPetAction("normal").catch(() => {});
 }
@@ -1711,7 +1740,7 @@ async function applyReviewSchedule(cardRef, quality) {
   // 不能等用户自己退出去再进来。
   if ($("schedulePage") && !$("schedulePage").hidden) { await refreshScheduleCards(); renderSchedule(scheduleFilter); }
 }
-async function slideToNext(quality) { const current = reviewQueue[reviewPosition]; if (!current) return; $("flashcard").classList.add("leaving"); await applyReviewSchedule(current, quality); if (quality === "掌握") { addPoints(10, "复习掌握"); playTopbarPetAction("levelup"); reviewStats.mastered += 1; } else { addPoints(2, "复习考核遗忘/模糊"); playTopbarPetAction("wave"); reviewStats.difficult.add(current.id); } reviewQueue.splice(reviewPosition, 1); if (quality === "忘记了") reviewQueue.push(current); saveReviewSession(); reviewPosition = 0; window.setTimeout(updateReviewCard, 240); }
+async function slideToNext(quality) { const current = reviewQueue[reviewPosition]; if (!current) return; $("flashcard").classList.add("leaving"); await applyReviewSchedule(current, quality); if (quality === "掌握") { addPoints(10, "复习掌握"); playDesktopPetAction("mastered"); playTopbarPetAction("blink"); reviewStats.mastered += 1; } else { addPoints(2, "复习考核遗忘/模糊"); playDesktopPetAction("forgotten"); playTopbarPetAction("blink"); reviewStats.difficult.add(current.id); } reviewQueue.splice(reviewPosition, 1); if (quality === "忘记了") reviewQueue.push(current); saveReviewSession(); reviewPosition = 0; window.setTimeout(updateReviewCard, 240); }
 function finishReviewAnswer(action) { if (!reviewQueue[reviewPosition]) return; const quality = action === "wrong" || pendingMemoryChoice === "forgot" ? "忘记了" : pendingMemoryChoice === "vague" ? "模糊" : "掌握"; slideToNext(quality); }
 function renderReviewLibrary(filter) { const cards = allReviewCards().filter((card) => filter === "all" || card.status === filter); const list = $("reviewCardList"); list.replaceChildren();
   // 列表为空时以前是整片空白：「未掌握」那个 tab 走的是复习测试、有自己的「今天没有需要复习的
@@ -1948,8 +1977,8 @@ $("toggleZhihuSelectAll")?.addEventListener("click", toggleZhihuSelectAll);
 $("desktopPetCard")?.addEventListener("click", openDesktopPet);
 $("desktopPetCard")?.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openDesktopPet(); } });
 $("desktopPetBack")?.addEventListener("click", closeDesktopPet);
-$("desktopPetSpriteButton")?.addEventListener("click", () => playDesktopPetAction(DESKTOP_PET_RANDOM_ACTIONS[Math.floor(Math.random() * DESKTOP_PET_RANDOM_ACTIONS.length)]));
-document.querySelectorAll("[data-pet-action]").forEach((button) => button.addEventListener("click", () => playDesktopPetAction(button.dataset.petAction)));
+$("desktopPetSpriteButton")?.addEventListener("click", () => playDesktopPetAction(DESKTOP_PET_RANDOM_ACTIONS[Math.floor(Math.random() * DESKTOP_PET_RANDOM_ACTIONS.length)], false));
+document.querySelectorAll("[data-pet-action]").forEach((button) => button.addEventListener("click", () => playDesktopPetAction(button.dataset.petAction, false)));
 $("topbarPetButton")?.addEventListener("click", openDesktopPet);
 $("zhihuConsentClose")?.addEventListener("click", closeZhihuConsent);
 $("zhihuConsentCancel")?.addEventListener("click", closeZhihuConsent);
@@ -2008,7 +2037,7 @@ $("cancelLoading").addEventListener("click", cancelDiscover);
 $("imageImportFile").addEventListener("change", (event) => importImage(event.target.files?.[0]));
 
 $("backToShelf").addEventListener("click", () => { $("bookDetail").hidden = true; $("bookList").hidden = false; $("newBookButton").hidden = false; });
-$("newBookButton").addEventListener("click", () => openBookSheet());
+$("newBookButton").addEventListener("click", () => { openBookSheet(); playDesktopPetAction("newbook"); playTopbarPetAction("blink"); });
 $("bookSheetClose").addEventListener("click", closeBookSheet); $("cancelBook").addEventListener("click", closeBookSheet);
 $("deleteBookButton").addEventListener("click", () => { if (!editingBookId) return; $("bookSheet").hidden = true; $("bookDeleteConfirm").hidden = false; });
 $("closeBookDeleteConfirm").addEventListener("click", () => { $("bookDeleteConfirm").hidden = true; $("bookSheet").hidden = false; });
@@ -2097,6 +2126,7 @@ $("saveNote").addEventListener("click", async () => {
   if (!title && !body) return;
   const existing = getNotes().find((item) => item.id === editingNoteId); const attachments = pendingAttachments.filter((file) => file.noteId === editingNoteId).map((file) => ({ ...file, noteId: editingNoteId })); const note = { id: editingNoteId, folderId: $("noteCategorySelect").value, title: title || "未命名笔记", content: body || NOTE_EMPTY_BODY, coverUrl: pendingNoteCoverUrl, date: new Date().toISOString(), attachments, template: clone(pendingNoteTemplate), starred: existing?.starred || false, syncStatus: "local" }; saveNote(note); saveAttachmentDrafts(); if (!existing) addPoints(10, "新建笔记");
   if (DEMO_MODE) { showToast("演示笔记已保存（刷新页面后自动清空）"); } else { try { const response = await authFetch(apiUrl("/api/notes/save"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...note, syncStatus: "synced" }) }); if (!response.ok) throw new Error(); note.syncStatus = "synced"; saveNote(note); showToast("笔记已同步云端"); } catch { showToast("后端暂未连通，已保存在本机浏览器中。"); } }
+  playDesktopPetAction("newnote"); playTopbarPetAction("blink");
   renderNotes($("noteSearch").value); renderProfile(); closeNoteSheet();
   activateAppPage("notesPage");
 });

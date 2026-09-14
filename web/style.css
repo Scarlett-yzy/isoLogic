@@ -1723,7 +1723,7 @@ textarea:focus, input:focus, .rich-editor:focus {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.topbar-pet img { width: auto; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; object-position: center bottom; user-select: none; -webkit-user-drag: none; transform: none; }
+.topbar-pet img { width: auto; height: 100%; max-width: 100%; object-fit: contain; object-position: center bottom; user-select: none; -webkit-user-drag: none; transform: none; }
 .topbar-pet:focus-visible { outline: 2px solid var(--brand-700); outline-offset: -4px; border-radius: 18px; }
 /* 给看山让出车位：不加这句，长签名会一直排到铃铛底下、被看山盖掉尾巴。
    签名短（比如「你好」）时它完全看不出效果；签名长到默认那句（204px）在窄屏上
@@ -1900,7 +1900,7 @@ label,
 }
 
 /* 同源分析耗时较长时，把等待提示提升到视口中央，阅读更舒适。 */
-.local-loading.is-discover-loading {
+.local-loading.is-long-loading {
   top: 50%;
   bottom: auto;
   width: min(360px, calc(100% - 28px));
@@ -1912,7 +1912,7 @@ label,
   border-radius: 22px;
   text-align: center;
 }
-.local-loading.is-discover-loading .loading-copy {
+.local-loading.is-long-loading .loading-copy {
   width: 100%;
   align-items: center;
 }
@@ -1928,7 +1928,11 @@ label,
 .loading-quote-mark { display: block; color: var(--brand-600, #4f8494); font-size: 19px; line-height: 1; }
 .loading-quote-card p { margin: 7px 0 5px; color: var(--ink); font-size: 16px; line-height: 1.65; }
 .loading-quote-card small { color: var(--muted); font-size: 12px; }
-.local-loading.is-discover-loading .loading-cancel { width: 100%; margin-left: 0; }
+.local-loading.is-long-loading .loading-cancel { width: 100%; margin-left: 0; }
+.pet-reaction-overlay { position: fixed; left: 50%; top: 50%; z-index: 60; display: grid; justify-items: center; gap: 8px; transform: translate(-50%, -50%); padding: 14px 18px; border: 1px solid var(--hairline); border-radius: 20px; background: rgba(255,255,255,.92); box-shadow: var(--sh-2); pointer-events: none; }
+.pet-reaction-overlay[hidden] { display: none; }
+.pet-reaction-overlay img { width: min(220px, 52vw); height: min(220px, 52vw); object-fit: contain; }
+.pet-reaction-overlay strong { color: var(--ink); font-size: 16px; }
 
 /* 极短角标也统一到 15px，不留“角标可以继续小”的例外。 */
 .notification-badge,
