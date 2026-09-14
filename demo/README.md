@@ -22,6 +22,7 @@
 | `edit_demo.py` | 剪辑脚本：按时间戳切段、给等待段加速、拼成 mp4 |
 | `steps.jsonl` | 本次录制的时间戳（每段的起点时刻 + 是否加速） |
 | `raw.video.path` | 指向原始 webm；**原始文件不随仓库分发**，见下方「重新剪辑」 |
+| `make_screenshots.py` | README 那组界面截图的拍摄脚本，走同一批输入文案，输出到 `../docs/images/` |
 
 ---
 

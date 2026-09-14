@@ -17,6 +17,7 @@
 
 **目录**
 
+- [界面实拍](#界面实拍)
 - [一、评委 3 分钟怎么验](#一评委-3-分钟怎么验)
 - [二、这是什么](#二这是什么)
 - [三、核心机制](#三核心机制)
@@ -30,6 +31,53 @@
 - [十一、命令行离线演示（不依赖网络）](#十一命令行离线演示不依赖网络)
 - [十二、目录结构与文档索引](#十二目录结构与文档索引)
 - [十三、协作者](#十三协作者)
+
+---
+
+## 界面实拍
+
+下面 7 张全部取自上面那条**线上链接的实际截图**——没有 mock、没有修图，与演示视频走同一条主线
+（**读懂它**用「免疫系统的负反馈调节」，**跨学科理解**用「排队系统」）。点图可看原图。
+
+<table>
+<tr>
+<td align="center" width="25%">
+<img src="docs/images/01-home.jpg" width="190"><br>
+<sub><b>求知首页</b><br>知乎搜索 / 手动创建 / 从截图导入</sub>
+</td>
+<td align="center" width="25%">
+<img src="docs/images/02-explain.jpg" width="190"><br>
+<sub><b>读懂它</b><br>解释正文，可存为卡片</sub>
+</td>
+<td align="center" width="25%">
+<img src="docs/images/03-logic-profile.jpg" width="190"><br>
+<sub><b>五维逻辑画像</b><br>概念 / 机制 / 因果 / 边界 / 领域</sub>
+</td>
+<td align="center" width="25%">
+<img src="docs/images/04-discover-report.jpg" width="190"><br>
+<sub><b>跨学科理解</b><br>原则条 + 学习报告</sub>
+</td>
+</tr>
+<tr>
+<td align="center" width="25%">
+<img src="docs/images/05-discover-candidates.jpg" width="190"><br>
+<sub><b>候选卡</b><br>检索相关性 · 逻辑同源度 · 判定</sub>
+</td>
+<td align="center" width="25%">
+<img src="docs/images/06-term-mapping.jpg" width="190"><br>
+<sub><b>术语对照</b><br>逐条给依据、局限与依据编号</sub>
+</td>
+<td align="center" width="25%">
+<img src="docs/images/07-zhihu-search.jpg" width="190"><br>
+<sub><b>知乎搜索</b><br>官方接口返回的真实讨论</sub>
+</td>
+<td align="center" width="25%"></td>
+</tr>
+</table>
+
+七张图的拍摄脚本是 [`demo/make_screenshots.py`](demo/make_screenshots.py)，和录屏脚本共用同一批
+输入文案与操作步骤（跑一遍全流程约 5 分钟，其中两处真调大模型）。换部署地址重拍：
+`LC_DEMO_BASE=https://你的域名 python3 make_screenshots.py`。
 
 ---
 
@@ -76,7 +124,7 @@
 ### 路径 C：知乎搜索 → 整合为学习笔记
 
 **求知** → **知乎搜索** → 输入 `负反馈 为什么能让系统稳定`。
-结果来自**知乎开放平台官方搜索接口**（不是爬页面正文）——实测返回 3 条真实知乎回答，
+结果来自**知乎开放平台官方搜索接口**（不是爬页面正文）——实测返回 5 条真实知乎回答（见上方截图），
 第一条是[《【控制理论】负反馈的本质：系统如何用误差不断修正自己》](https://zhuanlan.zhihu.com/p/2076311659174536381)。
 
 勾选 **2–6 篇** → 「整合为学习笔记」。实测选 3 篇得到一篇约 1000 字的笔记，标题
