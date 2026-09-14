@@ -18,10 +18,58 @@ SOURCE = ROOT / "docs" / "知源产品文档.md"
 OUT = ROOT / "output" / "pdf" / "知源产品文档.pdf"
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
-FONT = r"C:\Windows\Fonts\Deng.ttf"
-FONT_BOLD = r"C:\Windows\Fonts\Dengb.ttf"
-pdfmetrics.registerFont(TTFont("Deng", FONT))
-pdfmetrics.registerFont(TTFont("Deng-Bold", FONT_BOLD))
+# 中文正文字体。原来把路径写死成 Windows 的等线（Deng.ttf / Dengb.ttf），在 Linux 和
+# macOS 上直接 FileNotFoundError —— 而部署和 CI 恰恰都是 Linux，所以这份脚本一直只在
+# Windows 上出得了 PDF。现在按平台逐个找，都找不到就明确报错，别让它再静默地只支持一种系统。
+#
+# 每项是「常规 + 粗体」两份，路径可以是 TTC 字体集合，第二项是集合里的第几个字面：
+# Noto CJK 的集合顺序是 JP / KR / **SC** / TC / HK，简体在索引 2（实测 Regular 与 Bold
+# 两份顺序一致）；文泉驿只有两个字面，常规在前。
+FONT_CANDIDATES = [
+    ((r"C:\Windows\Fonts\Deng.ttf", 0), (r"C:\Windows\Fonts\Dengb.ttf", 0)),
+    (("~/.fonts/wqy-microhei.ttc", 0), ("~/.fonts/wqy-microhei.ttc", 0)),
+    (("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 0),
+     ("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 0)),
+    (("/System/Library/Fonts/PingFang.ttc", 0), ("/System/Library/Fonts/PingFang.ttc", 0)),
+    (("/usr/share/fonts/truetype/arphic/uming.ttc", 0),
+     ("/usr/share/fonts/truetype/arphic/uming.ttc", 0)),
+]
+
+
+def register_fonts():
+    """挑一套真能用的中文字体并注册，返回 (常规, 粗体) 路径。
+
+    逐个候选**试注册**而不是只看文件在不在：reportlab 的 TTFont 只吃 TrueType 的
+    glyf 轮廓，Noto Sans CJK 这类 CFF/OTF 轮廓（postscript outlines）会在注册时抛
+    TTFError —— 光判文件存在会挑中它然后整份文档失败。
+    """
+    skipped = []
+    for (reg, reg_idx), (bold, bold_idx) in FONT_CANDIDATES:
+        reg_path, bold_path = Path(reg).expanduser(), Path(bold).expanduser()
+        if not reg_path.exists():
+            continue
+        # 只有常规没有粗体时退回常规：标题字重会丢掉，但总比整份文档出不来强。
+        if not bold_path.exists():
+            bold_path, bold_idx = reg_path, reg_idx
+        try:
+            pdfmetrics.registerFont(TTFont("Deng", str(reg_path), subfontIndex=reg_idx))
+            pdfmetrics.registerFont(TTFont("Deng-Bold", str(bold_path), subfontIndex=bold_idx))
+        except Exception as exc:                      # noqa: BLE001 —— 换下一个候选
+            skipped.append(f"{reg_path.name}: {exc}")
+            continue
+        for note in skipped:
+            print(f"跳过 {note}")
+        return reg_path, bold_path
+    raise SystemExit(
+        "找不到 reportlab 能用的中文字体，装一个再跑：\n"
+        "  Debian/Ubuntu : apt install fonts-wqy-microhei\n"
+        "  或者把一份 TrueType 轮廓的中文字体放进 ~/.fonts/\n"
+        "注意 Noto Sans CJK 是 CFF/OTF 轮廓，reportlab 不支持。\n"
+        + ("".join(f"  已跳过 {s}\n" for s in skipped)))
+
+
+FONT, FONT_BOLD = register_fonts()
+print(f"字体：{FONT} / {FONT_BOLD}")
 
 styles = getSampleStyleSheet()
 styles.add(ParagraphStyle(name="DocTitle", parent=styles["Title"], fontName="Deng-Bold", fontSize=24, leading=32, alignment=TA_CENTER, textColor=colors.HexColor("#173B63"), spaceAfter=10))
@@ -34,6 +82,8 @@ styles.add(ParagraphStyle(name="BodyCN", parent=styles["BodyText"], fontName="De
 styles.add(ParagraphStyle(name="BulletCN", parent=styles["BodyText"], fontName="Deng", fontSize=11.5, leading=18, leftIndent=15, firstLineIndent=-10, bulletIndent=3, spaceAfter=4))
 styles.add(ParagraphStyle(name="SmallCN", parent=styles["BodyText"], fontName="Deng", fontSize=10.5, leading=16, textColor=colors.HexColor("#526677")))
 styles.add(ParagraphStyle(name="CodeCN", parent=styles["Code"], fontName="Deng", fontSize=9.5, leading=14, leftIndent=8, rightIndent=8, backColor=colors.HexColor("#F3F7FA"), borderColor=colors.HexColor("#D7E3EC"), borderWidth=.5, borderPadding=7))
+# 引用块（Markdown 的 `> `）。缩进 + 浅灰底，不要把 `>` 本身印到纸面上。
+styles.add(ParagraphStyle(name="QuoteCN", parent=styles["BodyText"], fontName="Deng", fontSize=11, leading=18, leftIndent=12, rightIndent=8, textColor=colors.HexColor("#526677"), backColor=colors.HexColor("#F5F8FA"), borderColor=colors.HexColor("#DCE7EF"), borderWidth=.5, borderPadding=7))
 
 def esc(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -86,6 +136,13 @@ def parse_md(text):
             else:
                 story.append(Paragraph(inline(title), {1: styles["H1cn"], 2: styles["H2cn"], 3: styles["H3cn"], 4: styles["H3cn"]}[level]))
             i += 1; continue
+        if line.startswith(">"):
+            quote = []
+            while i < len(lines) and lines[i].startswith(">"):
+                quote.append(lines[i].lstrip(">").strip())
+                i += 1
+            story += [Paragraph(inline(" ".join(q for q in quote if q)), styles["QuoteCN"]), Spacer(1, 6)]
+            continue
         if line.startswith("- ") or line.startswith("* ") or re.match(r"^\d+\.\s+", line):
             items = []
             while i < len(lines) and (lines[i].startswith("- ") or lines[i].startswith("* ") or re.match(r"^\d+\.\s+", lines[i])):
@@ -110,7 +167,7 @@ def parse_md(text):
             story += [tbl, Spacer(1, 6)]; continue
         para = [line.strip()]
         i += 1
-        while i < len(lines) and lines[i].strip() and not re.match(r"^(#{1,4})\s|^[-*]\s|^\d+\.\s+|^```", lines[i]) and "|" not in lines[i]:
+        while i < len(lines) and lines[i].strip() and not re.match(r"^(#{1,4})\s|^[-*]\s|^\d+\.\s+|^```|^>", lines[i]) and "|" not in lines[i]:
             para.append(lines[i].strip()); i += 1
         story.append(Paragraph(inline(" ".join(para)), styles["BodyCN"]))
     return story

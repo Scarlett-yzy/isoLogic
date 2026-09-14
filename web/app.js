@@ -916,6 +916,10 @@ function renderCandidates(data) {
     container.append(card);
   });
   $("discoverEmpty").hidden = records.length > 0;
+  // 「找到了同源」= 至少有一条被判为可靠。调用方据此决定要不要发奖励和放桌宠动画：
+  // 检索闸门会合法地返回 0 候选（面板随即显示「当前证据不足，不强行建立类比」），
+  // 那种情况下还发「发现跨学科同源」的分数和庆祝动画，等于奖励一次没有结论的查询。
+  return records.some((record) => effectiveVerdict(record, reportFor(record), homologyFor(record)) === "RELIABLE_WITH_LIMITS");
 }
 
 async function discover() {
@@ -947,16 +951,18 @@ async function discover() {
       return;
     }
     state.discoverSessionId = data.session_id;
-    addPoints(15, "发现跨学科同源");
-    playTopbarPetAction("crosslink");
     setDraftForPanel("discoverPanel", text);
     addHistory("跨学科理解", text, state.discoverSessionId, data);
     clearDraftForPanel("discoverPanel");
     $("discoverTitle").textContent = `发现同源 · ${data.concept?.name || text.slice(0, 30)}`;
     renderRichText($("discoverReport"), data.report || "同源分析已完成。");
-    renderCandidates(data); $("discoverResult").hidden = false; $("historyBackButton").hidden = false; $("historyMemory").classList.add("has-result-back");
+    const foundReliable = renderCandidates(data);
+    $("discoverResult").hidden = false; $("historyBackButton").hidden = false; $("historyMemory").classList.add("has-result-back");
     if ((data.report || "").includes("LLM 调用失败") || (data.report || "").includes("无法完成特征提取")) {
       showError("discoverError", "同源分析当前无法连接模型后端，请确认 LLM 网关已经启动。");
+    } else if (foundReliable) {
+      addPoints(15, "发现跨学科同源");
+      playTopbarPetAction("crosslink");
     }
   } catch (error) { if (error.name !== "AbortError") { console.error("Discover request failed", error); showError("discoverError", error.message); } }
   finally { if (state.discoverRequestId === requestId) { state.discoverAbortController = null; state.discoverRequestId = null; setLoading(false, "", $("discoverButton")); } }

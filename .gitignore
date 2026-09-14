@@ -44,3 +44,6 @@ __MACOSX/
 # ⚠️ 这份 docx 里手打进了真实的 LC_API_KEY（.env 已在上面忽略，这份是同一把）。
 # 要拿它进库，先把密钥换回占位符「sk-交付方私聊发给你的那串」再提交。
 /CloudBase演示部署方案.docx
+
+# 剪辑中间产物（edit_demo.py 生成，跑一遍即可复现）
+demo/segs/
