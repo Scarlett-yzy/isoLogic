@@ -14,6 +14,21 @@ from .note_store import ensure_storage
 from .service import ServiceError
 
 
+class CachedStaticFiles(StaticFiles):
+    """Cache immutable visual assets so pet animation never re-fetches every frame."""
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        normalized_path = path.replace("\\", "/")
+        if normalized_path.startswith("assets/"):
+            # 一天即可：单次会话内素材不会重复下载，而桌宠素材还在反复裁切，
+            # 设成一年 immutable 会让老访客永远看不到新图，排查时极易误判。
+            response.headers["Cache-Control"] = "public, max-age=86400, immutable"
+        else:
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 app = FastAPI(title="Logic-Coloc API")
 app.add_middleware(
     CORSMiddleware,
@@ -30,7 +45,7 @@ async def service_error_handler(_request: Request, exc: ServiceError) -> JSONRes
     return JSONResponse(status_code=exc.status_code, content={"error": {"code": exc.code, "message": exc.message}})
 
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
-app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+app.mount("/static", CachedStaticFiles(directory=WEB_DIR), name="static")
 ensure_storage()
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 

@@ -1001,7 +1001,9 @@ const DESKTOP_PET_ACTIONS = Object.freeze({
 const DESKTOP_PET_RANDOM_ACTIONS = ["wave", "idea", "followup", "crosslink"];
 const desktopPetReduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 let desktopPetTimer = null;
-let desktopPetPreloaded = false;
+const desktopPetFrameCache = new Map();
+const desktopPetResolvedFrames = new Map();
+let desktopPetPlayId = 0;
 
 function desktopPetFramePath(action, index) {
   return `/static/assets/pet/${action}/${action}_${index + 1}.webp`;
@@ -1009,58 +1011,95 @@ function desktopPetFramePath(action, index) {
 function topbarPetFramePath(action, index) {
   return `/static/assets/pet/topbar/${action}/${action}_${index + 1}.webp`;
 }
+function cachedDesktopPetFramePath(action, index, topbar = false) {
+  return desktopPetResolvedFrames.get(`${topbar ? "topbar" : "main"}:${action}`)?.[index]?.src
+    || (topbar ? topbarPetFramePath(action, index) : desktopPetFramePath(action, index));
+}
 
-function preloadDesktopPetFrames() {
-  if (desktopPetPreloaded) return;
-  desktopPetPreloaded = true;
-  Object.entries(DESKTOP_PET_ACTIONS).forEach(([action, config]) => {
-    for (let index = 0; index < config.frames; index += 1) {
-      const image = new Image(); image.src = desktopPetFramePath(action, index);
-    }
+function loadDesktopPetFrame(path, retry = 0) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const timer = window.setTimeout(() => reject(new Error(`桌宠素材加载超时：${path}`)), 8000);
+    image.onload = () => { window.clearTimeout(timer); resolve(image); };
+    image.onerror = () => {
+      window.clearTimeout(timer);
+      if (retry < 2) window.setTimeout(() => loadDesktopPetFrame(path, retry + 1).then(resolve, reject), 500 * (retry + 1));
+      else reject(new Error(`桌宠素材加载失败：${path}`));
+    };
+    image.src = retry ? `${path}?retry=${retry}` : path;
   });
+}
+
+function preloadDesktopPetAction(action, topbar = false) {
+  const key = `${topbar ? "topbar" : "main"}:${action}`;
+  if (desktopPetFrameCache.has(key)) return desktopPetFrameCache.get(key);
+  const config = DESKTOP_PET_ACTIONS[action];
+  const promise = (async () => {
+    const frames = [];
+    // 每批只取 3 帧，避免云托管被几十个并发静态请求冲垮。
+    for (let index = 0; index < config.frames; index += 3) {
+      const batch = [index, index + 1, index + 2].filter((item) => item < config.frames);
+      frames.push(...await Promise.all(batch.map((item) => loadDesktopPetFrame(topbar ? topbarPetFramePath(action, item) : desktopPetFramePath(action, item)))));
+    }
+    desktopPetResolvedFrames.set(key, frames);
+    return frames;
+  })();
+  desktopPetFrameCache.set(key, promise);
+  promise.catch(() => desktopPetFrameCache.delete(key));
+  return promise;
 }
 
 function setDesktopPetFrame(action, index) {
   const config = DESKTOP_PET_ACTIONS[action];
   if (!config || !$("desktopPetSprite")) return;
-  $("desktopPetSprite").src = desktopPetFramePath(action, index);
+  $("desktopPetSprite").src = cachedDesktopPetFramePath(action, index);
   $("desktopPetSprite").alt = `看山：${config.label}`;
   $("desktopPetFrame").textContent = `${action} · ${String(index + 1).padStart(2, "0")}/${String(config.frames).padStart(2, "0")}`;
   $("desktopPetProgress").style.width = `${((index + 1) / config.frames) * 100}%`;
 }
 let topbarPetTimer = null;
 let topbarPetPauseTimer = null;
+let topbarPetPlayId = 0;
 function clearTopbarPetTimers() {
   if (topbarPetTimer) { window.clearInterval(topbarPetTimer); topbarPetTimer = null; }
   if (topbarPetPauseTimer) { window.clearTimeout(topbarPetPauseTimer); topbarPetPauseTimer = null; }
 }
-function startTopbarGreetingLoop() {
+async function startTopbarGreetingLoop() {
   const sprite = $("topbarPetSprite"), config = DESKTOP_PET_ACTIONS.wave;
   if (!sprite || !config) return;
   clearTopbarPetTimers();
+  const playId = ++topbarPetPlayId;
+  try { await preloadDesktopPetAction("wave", true); }
+  catch (error) { console.warn(error.message); topbarPetPauseTimer = window.setTimeout(startTopbarGreetingLoop, 3000); return; }
+  if (playId !== topbarPetPlayId) return;
   let index = 0;
-  sprite.src = topbarPetFramePath("wave", index);
+  sprite.src = cachedDesktopPetFramePath("wave", index, true);
   if (desktopPetReduceMotion) { topbarPetPauseTimer = window.setTimeout(startTopbarGreetingLoop, 3000); return; }
   topbarPetTimer = window.setInterval(() => {
     index += 1;
     if (index >= config.frames) { clearTopbarPetTimers(); topbarPetPauseTimer = window.setTimeout(startTopbarGreetingLoop, 3000); return; }
-    sprite.src = topbarPetFramePath("wave", index);
+    sprite.src = cachedDesktopPetFramePath("wave", index, true);
   }, 182);
 }
-function playTopbarPetAction(action) {
+async function playTopbarPetAction(action) {
   const config = DESKTOP_PET_ACTIONS[action], sprite = $("topbarPetSprite");
   if (!config || !sprite) return;
   clearTopbarPetTimers();
-  let index = 0; sprite.src = topbarPetFramePath(action, index);
+  const playId = ++topbarPetPlayId;
+  try { await preloadDesktopPetAction(action, true); }
+  catch (error) { console.warn(error.message); topbarPetPauseTimer = window.setTimeout(startTopbarGreetingLoop, 3000); return; }
+  if (playId !== topbarPetPlayId) return;
+  let index = 0; sprite.src = cachedDesktopPetFramePath(action, index, true);
   if (desktopPetReduceMotion) { topbarPetPauseTimer = window.setTimeout(startTopbarGreetingLoop, action === "wave" ? 3000 : 700); return; }
   topbarPetTimer = window.setInterval(() => {
     index += 1;
     if (index >= config.frames) { clearTopbarPetTimers(); topbarPetPauseTimer = window.setTimeout(startTopbarGreetingLoop, action === "wave" ? 3000 : 700); return; }
-    sprite.src = topbarPetFramePath(action, index);
+    sprite.src = cachedDesktopPetFramePath(action, index, true);
   }, 182);
 }
 
 function restDesktopPet(keepSpeech = true) {
+  desktopPetPlayId += 1;
   if (desktopPetTimer) { window.clearInterval(desktopPetTimer); desktopPetTimer = null; }
   document.querySelectorAll("[data-pet-action]").forEach((button) => button.classList.remove("is-playing"));
   if (!$("desktopPetState")) return;
@@ -1069,13 +1108,17 @@ function restDesktopPet(keepSpeech = true) {
   setDesktopPetFrame("normal", 0);
 }
 
-function playDesktopPetAction(action) {
+async function playDesktopPetAction(action) {
   const config = DESKTOP_PET_ACTIONS[action];
   if (!config || !$("desktopPetSprite")) return;
   if (desktopPetTimer) window.clearInterval(desktopPetTimer);
+  const playId = ++desktopPetPlayId;
   document.querySelectorAll("[data-pet-action]").forEach((button) => button.classList.toggle("is-playing", button.dataset.petAction === action));
   $("desktopPetState").textContent = config.label;
   $("desktopPetSpeech").textContent = config.speech;
+  try { await preloadDesktopPetAction(action); }
+  catch (error) { console.warn(error.message); if (playId === desktopPetPlayId) restDesktopPet(true); return; }
+  if (playId !== desktopPetPlayId) return;
   if (desktopPetReduceMotion) { setDesktopPetFrame(action, config.frames - 1); desktopPetTimer = window.setTimeout(() => restDesktopPet(true), 700); return; }
   let index = 0;
   setDesktopPetFrame(action, index);
@@ -1087,11 +1130,12 @@ function playDesktopPetAction(action) {
 }
 
 function openDesktopPet() {
-  preloadDesktopPetFrames();
   const points = getPoints(), level = getLevelInfo(points);
   $("desktopPetEnergy").textContent = `${level.level} · ${points} 能量`;
   activateAppPage("desktopPetPage");
   playDesktopPetAction("wave");
+  // 待机帧趁挥手这 2 秒的空档先备好，免得收势时精灵图闪一下空白。
+  preloadDesktopPetAction("normal").catch(() => {});
 }
 
 function closeDesktopPet() {
