@@ -1,0 +1,152 @@
+[
+ {
+  "name": "v0_start",
+  "t": 1789400251.088,
+  "accel": false
+ },
+ {
+  "name": "s0_load",
+  "t": 1789400251.09,
+  "accel": false
+ },
+ {
+  "name": "s1_tab",
+  "t": 1789400260.091,
+  "accel": false
+ },
+ {
+  "name": "s1_type",
+  "t": 1789400262.273,
+  "accel": false
+ },
+ {
+  "name": "s1_wait",
+  "t": 1789400264.833,
+  "accel": true
+ },
+ {
+  "name": "s1_show",
+  "t": 1789400280.575,
+  "accel": false
+ },
+ {
+  "name": "s1_save",
+  "t": 1789400290.962,
+  "accel": false
+ },
+ {
+  "name": "s1_saved",
+  "t": 1789400296.472,
+  "accel": false
+ },
+ {
+  "name": "s2_tab",
+  "t": 1789400305.735,
+  "accel": false
+ },
+ {
+  "name": "s2_type",
+  "t": 1789400307.778,
+  "accel": false
+ },
+ {
+  "name": "s2_wait",
+  "t": 1789400310.194,
+  "accel": true
+ },
+ {
+  "name": "s2_show",
+  "t": 1789400453.31,
+  "accel": false
+ },
+ {
+  "name": "s2_mapping",
+  "t": 1789400463.475,
+  "accel": false
+ },
+ {
+  "name": "s2_back",
+  "t": 1789400467.564,
+  "accel": false
+ },
+ {
+  "name": "s3_open",
+  "t": 1789400477.57,
+  "accel": false
+ },
+ {
+  "name": "s3_type",
+  "t": 1789400478.556,
+  "accel": false
+ },
+ {
+  "name": "s3_wait",
+  "t": 1789400479.327,
+  "accel": true
+ },
+ {
+  "name": "s3_show",
+  "t": 1789400479.95,
+  "accel": false
+ },
+ {
+  "name": "s4_nav",
+  "t": 1789400485.23,
+  "accel": false
+ },
+ {
+  "name": "s4_wave",
+  "t": 1789400491.077,
+  "accel": false
+ },
+ {
+  "name": "s4_idea",
+  "t": 1789400493.852,
+  "accel": false
+ },
+ {
+  "name": "s4_followup",
+  "t": 1789400496.537,
+  "accel": false
+ },
+ {
+  "name": "s4_crosslink",
+  "t": 1789400499.219,
+  "accel": false
+ },
+ {
+  "name": "s4_levelup",
+  "t": 1789400501.901,
+  "accel": false
+ },
+ {
+  "name": "s4_normal",
+  "t": 1789400504.584,
+  "accel": false
+ },
+ {
+  "name": "s4_touch",
+  "t": 1789400507.268,
+  "accel": false
+ },
+ {
+  "name": "s5_nav",
+  "t": 1789400511.236,
+  "accel": false
+ },
+ {
+  "name": "s5_done",
+  "t": 1789400519.114,
+  "accel": false
+ },
+ {
+  "name": "s6_home",
+  "t": 1789400521.321,
+  "accel": false
+ },
+ {
+  "name": "v1_end",
+  "t": 1789400523.802,
+  "accel": false
+ }
+]

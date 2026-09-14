@@ -183,3 +183,32 @@ def test_explicit_feedback_anchor_survives_unhelpful_extracted_terms() -> None:
         top_k=5,
     )
     assert any(item.id == "immune_negative_feedback" for item in results)
+
+
+def test_keyword_anchor_survives_verbose_extracted_terms() -> None:
+    """一个真实的关键词锚点不该被「模型这次多吐了几个词」稀释掉。
+
+    `_keyword_score` = 命中数 / 请求词数，而请求词是模型现场抽的。旧闸门拿
+    `_score(profile=None)` 的整体加权分跟 0.12 比，keyword 项占 0.30、无画像时分母
+    是 0.9，于是同一个「熔断器 ↔ 熔断」锚点：
+
+        命中 1/1 → keyword=1.00 → 0.30×1.00/0.9 = 0.333 ≥ 0.12  → 出候选
+        命中 1/3 → keyword=0.33 → 0.30×0.33/0.9 = 0.111 < 0.12  → 整片空白
+
+    线上表现就是同一段话有时出候选、有时整片空白（线上这轮真实抽出的 key_terms 正是
+    三个词 `["熔断器", "接口错误率", "故障雪崩"]`，只有第一个对得上语料）。
+    闸门问的是「有没有可解释的锚点」，这该是布尔判断，不能拿会被稀释的分数去比阈值。
+    """
+    text = "服务端熔断器：当接口错误率超过阈值时自动切断调用并快速失败，防止故障沿调用链扩散引发雪崩。"
+    # 模型多抽了两个和语料关键词不搭界的词，锚点仍然只有一个「熔断」
+    results = Retriever(Corpus().load()).retrieve(
+        text, keywords=["熔断器", "服务端", "错误率"], top_k=5)
+    assert any(item.id == "circuit_breaker" for item in results)
+
+
+def test_verbose_terms_do_not_manufacture_an_anchor() -> None:
+    """反过来：词多不能凭空造出锚点 —— 一个都不命中仍然要返回空。"""
+    results = Retriever(Corpus().load()).retrieve(
+        "完全不在当前知识库覆盖范围内的孤立事实",
+        keywords=["张三", "李四", "王五"], top_k=5)
+    assert results == []
